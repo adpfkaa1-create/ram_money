@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>가계부</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- 사이드바 -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">帳</span>
+      <div class="brand-text">
+        <strong>가계부</strong>
+        <small>Personal Ledger</small>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-tab active" data-view="dashboard">
+        <span class="tab-idx">01</span>대시보드
+      </button>
+      <button class="nav-tab" data-view="records">
+        <span class="tab-idx">02</span>기록
+      </button>
+      <button class="nav-tab" data-view="categories">
+        <span class="tab-idx">03</span>카테고리
+      </button>
+      <button class="nav-tab" data-view="assets">
+        <span class="tab-idx">04</span>자산
+      </button>
+    </nav>
+
+    <div class="sidebar-foot">
+      <span id="dataStamp" class="stamp">LOCAL SAVE</span>
+    </div>
+  </aside>
+
+  <!-- 메인 -->
+  <main class="main">
+
+    <!-- ===================== 대시보드 ===================== -->
+    <section class="view active" id="view-dashboard">
+      <header class="view-head">
+        <div>
+          <span class="eyebrow">Overview</span>
+          <h1>대시보드</h1>
+        </div>
+        <label class="month-picker">
+          <span>조회 월</span>
+          <input type="month" id="dashMonth">
+        </label>
+      </header>
+
+      <div class="stat-row">
+        <div class="stat-card in">
+          <span class="stat-label">총수입</span>
+          <span class="stat-value" id="statIncome">0</span>
+        </div>
+        <div class="stat-card out">
+          <span class="stat-label">총지출</span>
+          <span class="stat-value" id="statExpense">0</span>
+        </div>
+        <div class="stat-card net">
+          <span class="stat-label">순잔액</span>
+          <span class="stat-value" id="statNet">0</span>
+        </div>
+      </div>
+
+      <div class="panel-grid">
+        <div class="ledger-panel">
+          <h2>카테고리별 지출</h2>
+          <div id="catBreakdown" class="bar-list"></div>
+        </div>
+
+        <div class="ledger-panel">
+          <h2>결제수단별 지출</h2>
+          <div id="methodBreakdown" class="bar-list"></div>
+        </div>
+
+        <div class="ledger-panel wide">
+          <h2>총자산</h2>
+          <div class="asset-summary">
+            <div>
+              <span class="stat-label">이번 달 총자산</span>
+              <span class="stat-value big" id="dashAssetTotal">0</span>
+            </div>
+            <div>
+              <span class="stat-label">전월 대비</span>
+              <span class="stat-value delta" id="dashAssetDelta">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== 기록 ===================== -->
+    <section class="view" id="view-records">
+      <header class="view-head">
+        <div>
+          <span class="eyebrow">Entries</span>
+          <h1>수입·지출 기록</h1>
+        </div>
+        <label class="month-picker">
+          <span>조회 월</span>
+          <input type="month" id="recMonth">
+        </label>
+      </header>
+
+      <form class="entry-form" id="entryForm">
+        <input type="hidden" id="entryId">
+
+        <div class="type-toggle">
+          <button type="button" class="toggle-btn active" data-type="expense">지출</button>
+          <button type="button" class="toggle-btn" data-type="income">수입</button>
+        </div>
+
+        <div class="form-grid">
+          <label>날짜
+            <input type="date" id="entryDate" required>
+          </label>
+          <label>금액
+            <input type="number" id="entryAmount" min="0" step="1" placeholder="0" required>
+          </label>
+          <label>카테고리
+            <select id="entryCategory" required></select>
+          </label>
+          <label id="methodWrap">결제수단
+            <select id="entryMethod">
+              <option value="card">카드</option>
+              <option value="cash">현금</option>
+            </select>
+          </label>
+          <label class="memo-field">내용
+            <input type="text" id="entryMemo" placeholder="메모 (선택)">
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary" id="entrySubmitBtn">기록 추가</button>
+          <button type="button" class="btn-ghost" id="entryCancelBtn" hidden>취소</button>
+        </div>
+      </form>
+
+      <div class="ledger-panel">
+        <div class="panel-head-row">
+          <h2>내역</h2>
+          <span class="sum-tag" id="recordCount">0건</span>
+        </div>
+        <div class="table-wrap">
+          <table class="ledger-table" id="recordTable">
+            <thead>
+              <tr>
+                <th>날짜</th>
+                <th>구분</th>
+                <th>카테고리</th>
+                <th>내용</th>
+                <th>수단</th>
+                <th class="num">금액</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="recordBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== 카테고리 ===================== -->
+    <section class="view" id="view-categories">
+      <header class="view-head">
+        <div>
+          <span class="eyebrow">Manage</span>
+          <h1>카테고리 관리</h1>
+        </div>
+      </header>
+
+      <div class="panel-grid two">
+        <div class="ledger-panel">
+          <h2>지출 카테고리</h2>
+          <form class="inline-add" data-cat-type="expense">
+            <input type="text" placeholder="새 카테고리명" required>
+            <button type="submit" class="btn-primary small">추가</button>
+          </form>
+          <ul class="cat-list" id="expenseCatList"></ul>
+        </div>
+
+        <div class="ledger-panel">
+          <h2>수입 카테고리</h2>
+          <form class="inline-add" data-cat-type="income">
+            <input type="text" placeholder="새 카테고리명" required>
+            <button type="submit" class="btn-primary small">추가</button>
+          </form>
+          <ul class="cat-list" id="incomeCatList"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== 자산 ===================== -->
+    <section class="view" id="view-assets">
+      <header class="view-head">
+        <div>
+          <span class="eyebrow">Net Worth</span>
+          <h1>자산 관리</h1>
+        </div>
+        <label class="month-picker">
+          <span>입력 월</span>
+          <input type="month" id="assetMonth">
+        </label>
+      </header>
+
+      <div class="ledger-panel">
+        <div class="panel-head-row">
+          <h2>자산 항목</h2>
+        </div>
+        <form class="inline-add asset-add" id="assetAddForm">
+          <input type="text" id="newAssetName" placeholder="항목명 (예: 주거래통장, 주택담보대출)" required>
+          <label class="check-field">
+            <input type="checkbox" id="newAssetIsDebt">
+            마이너스 자산(대출 등)
+          </label>
+          <button type="submit" class="btn-primary small">항목 추가</button>
+        </form>
+
+        <div class="table-wrap">
+          <table class="ledger-table" id="assetTable">
+            <thead>
+              <tr>
+                <th>항목명</th>
+                <th>유형</th>
+                <th class="num">이번 달 잔액</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="assetBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel-grid wide-only">
+        <div class="ledger-panel wide">
+          <h2>자산 변동 요약</h2>
+          <div class="asset-summary">
+            <div>
+              <span class="stat-label">총자산 (이번 달)</span>
+              <span class="stat-value big" id="assetTotalNow">0</span>
+            </div>
+            <div>
+              <span class="stat-label">전월 대비 변동</span>
+              <span class="stat-value delta" id="assetTotalDelta">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
