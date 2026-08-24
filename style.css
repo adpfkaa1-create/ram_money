@@ -323,9 +323,12 @@ button, input, select {
   overflow: hidden;
 }
 .bar-fill {
+  display: block;
   height: 100%;
+  min-width: 3px;
   background: var(--coral);
   border-radius: 999px;
+  transition: width 0.3s ease;
 }
 .bar-fill.income-fill { background: var(--blue-deep); }
 .bar-row .bar-amount {
