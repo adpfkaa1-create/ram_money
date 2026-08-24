@@ -332,11 +332,18 @@
     renderRecords();
   }
 
+  let groupByCategory = false;
+  const groupToggleBtn = document.getElementById('groupToggleBtn');
+  groupToggleBtn.addEventListener('click', () => {
+    groupByCategory = !groupByCategory;
+    groupToggleBtn.classList.toggle('active', groupByCategory);
+    groupToggleBtn.textContent = groupByCategory ? '날짜순으로 보기' : '카테고리별로 보기';
+    renderRecords();
+  });
+
   function renderRecords() {
     const month = recMonth.value;
-    const list = state.transactions
-      .filter(t => t.date.startsWith(month))
-      .sort((a, b) => b.date.localeCompare(a.date));
+    const list = state.transactions.filter(t => t.date.startsWith(month));
 
     document.getElementById('recordCount').textContent = list.length + '건';
 
@@ -345,29 +352,66 @@
 
     if (!list.length) {
       body.innerHTML = '<tr><td colspan="7" class="empty-note">이 달의 기록이 없습니다.</td></tr>';
+      return;
+    }
+
+    if (groupByCategory) {
+      renderGroupedRows(list, body);
     } else {
-      list.forEach(tx => {
-        const cat = categoryById(tx.categoryId);
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${tx.date}</td>
-          <td><span class="type-pill ${tx.type}">${tx.type === 'income' ? '수입' : '지출'}</span></td>
-          <td>${cat ? escapeHtml(cat.name) : '삭제된 카테고리'}</td>
-          <td>${escapeHtml(tx.memo || '-')}</td>
-          <td>${tx.method ? (tx.method === 'card' ? '카드' : '현금') : '-'}</td>
-          <td class="num amount-cell ${tx.type}">${tx.type === 'income' ? '+' : '-'}${fmt(tx.amount)}</td>
-          <td>
-            <div class="row-actions">
-              <button class="icon-btn" data-edit="${tx.id}">수정</button>
-              <button class="icon-btn danger" data-del="${tx.id}">삭제</button>
-            </div>
-          </td>`;
-        body.appendChild(tr);
-      });
+      list.sort((a, b) => b.date.localeCompare(a.date)).forEach(tx => body.appendChild(buildRecordRow(tx)));
     }
 
     body.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => editTransaction(b.dataset.edit)));
     body.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => deleteTransaction(b.dataset.del)));
+  }
+
+  function renderGroupedRows(list, body) {
+    const groups = {};
+    list.forEach(t => {
+      if (!groups[t.categoryId]) groups[t.categoryId] = { type: t.type, total: 0, items: [] };
+      groups[t.categoryId].total += t.amount;
+      groups[t.categoryId].items.push(t);
+    });
+
+    const expenseGroups = Object.entries(groups).filter(([, g]) => g.type === 'expense').sort((a, b) => b[1].total - a[1].total);
+    const incomeGroups = Object.entries(groups).filter(([, g]) => g.type === 'income').sort((a, b) => b[1].total - a[1].total);
+
+    [...expenseGroups, ...incomeGroups].forEach(([catId, g]) => {
+      const cat = categoryById(catId);
+      const groupRow = document.createElement('tr');
+      groupRow.className = 'group-row';
+      groupRow.innerHTML = `
+        <td colspan="7">
+          <div class="group-head">
+            <span class="type-pill ${g.type}">${g.type === 'income' ? '수입' : '지출'}</span>
+            <span class="group-name">${cat ? escapeHtml(cat.name) : '삭제된 카테고리'}</span>
+            <span class="group-count">${g.items.length}건</span>
+            <span class="group-total ${g.type}">${g.type === 'income' ? '+' : '-'}${fmt(g.total)}원</span>
+          </div>
+        </td>`;
+      body.appendChild(groupRow);
+
+      g.items.sort((a, b) => b.date.localeCompare(a.date)).forEach(tx => body.appendChild(buildRecordRow(tx)));
+    });
+  }
+
+  function buildRecordRow(tx) {
+    const cat = categoryById(tx.categoryId);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${tx.date}</td>
+      <td><span class="type-pill ${tx.type}">${tx.type === 'income' ? '수입' : '지출'}</span></td>
+      <td>${cat ? escapeHtml(cat.name) : '삭제된 카테고리'}</td>
+      <td>${escapeHtml(tx.memo || '-')}</td>
+      <td>${tx.method ? (tx.method === 'card' ? '카드' : '현금') : '-'}</td>
+      <td class="num amount-cell ${tx.type}">${tx.type === 'income' ? '+' : '-'}${fmt(tx.amount)}</td>
+      <td>
+        <div class="row-actions">
+          <button class="icon-btn" data-edit="${tx.id}">수정</button>
+          <button class="icon-btn danger" data-del="${tx.id}">삭제</button>
+        </div>
+      </td>`;
+    return tr;
   }
 
   /* ================================================================
