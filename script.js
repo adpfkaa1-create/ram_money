@@ -3,6 +3,21 @@
 
   const STORAGE_KEY = 'ledger_state_v1';
 
+  const firebaseConfig = {
+    apiKey: "AIzaSyCQw2gUFGzbwm0QP4c9sAw9MjVu1kWifEQ",
+    authDomain: "yr-money.firebaseapp.com",
+    projectId: "yr-money",
+    storageBucket: "yr-money.firebasestorage.app",
+    messagingSenderId: "181846143622",
+    appId: "1:181846143622:web:38a6b638142ad7361f5707",
+  };
+
+  // 클라우드 연결이 준비되면 채워짐. 실패해도 앱은 로컬 저장만으로 정상 동작.
+  let cloudDocRef = null;
+  let cloudSetDoc = null;
+  let lastSyncedJson = null;
+  let firstSnapshot = true;
+
   /* ============ 상태 ============ */
   const defaultState = () => ({
     categories: [
@@ -46,14 +61,85 @@
 
   let state = loadState();
 
-  function saveState() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  function setStamp(text, revertAfterMs) {
     const stamp = document.getElementById('dataStamp');
-    if (stamp) {
-      stamp.textContent = '저장됨 ' + new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-      stamp.style.opacity = '1';
-      clearTimeout(saveState._t);
-      saveState._t = setTimeout(() => { stamp.textContent = 'LOCAL SAVE'; }, 1800);
+    if (!stamp) return;
+    stamp.textContent = text;
+    clearTimeout(setStamp._t);
+    if (revertAfterMs) {
+      setStamp._t = setTimeout(() => { stamp.textContent = 'CLOUD SYNC'; }, revertAfterMs);
+    }
+  }
+
+  function saveState() {
+    const json = JSON.stringify(state);
+    localStorage.setItem(STORAGE_KEY, json);
+
+    if (!cloudDocRef || !cloudSetDoc) return; // 클라우드 미연결 시 로컬 저장까지만
+
+    lastSyncedJson = json;
+    setStamp('동기화 중...');
+    cloudSetDoc(cloudDocRef, { json, updatedAt: Date.now() })
+      .then(() => setStamp('동기화됨 ' + new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }), 2000))
+      .catch((err) => {
+        console.error('클라우드 저장 실패, 이 기기에만 저장됨', err);
+        setStamp('오프라인 저장(이 기기만)', 3000);
+      });
+  }
+
+  /* ============ 클라우드 동기화 (실패해도 앱 동작에는 영향 없음) ============ */
+  async function initCloudSync() {
+    try {
+      const [{ initializeApp }, firestoreMod] = await Promise.all([
+        import('https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js'),
+        import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js'),
+      ]);
+      const { getFirestore, doc, setDoc, onSnapshot } = firestoreMod;
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+      cloudDocRef = doc(db, 'ledger', 'main');
+      cloudSetDoc = setDoc;
+
+      onSnapshot(cloudDocRef, (snap) => {
+        if (!snap.exists()) {
+          // 클라우드에 데이터가 아직 없으면 현재(로컬) 상태를 최초 업로드
+          firstSnapshot = false;
+          saveState();
+          return;
+        }
+        const data = snap.data();
+        if (data.json === lastSyncedJson) {
+          firstSnapshot = false;
+          return;
+        }
+        try {
+          const parsed = JSON.parse(data.json);
+          state = {
+            categories: parsed.categories || [],
+            transactions: parsed.transactions || [],
+            assets: parsed.assets || [],
+            assetSnapshots: parsed.assetSnapshots || {},
+          };
+          lastSyncedJson = data.json;
+          localStorage.setItem(STORAGE_KEY, data.json);
+          populateCategorySelect();
+          renderDashboard();
+          renderRecords();
+          renderCategories();
+          renderAssets();
+          if (!firstSnapshot) setStamp('다른 기기에서 업데이트됨', 2500);
+        } catch (e) {
+          console.error('클라우드 데이터 파싱 실패', e);
+        }
+        firstSnapshot = false;
+      }, (err) => {
+        console.error('클라우드 연결 실패', err);
+        setStamp('연결 오류(이 기기만 저장됨)', 3000);
+      });
+    } catch (e) {
+      console.error('클라우드 동기화를 불러오지 못했습니다. 이 기기에만 저장됩니다.', e);
+      setStamp('오프라인 모드(이 기기만)', 4000);
     }
   }
 
@@ -537,10 +623,13 @@
     setDelta(document.getElementById('assetTotalDelta'), totalNow, totalPrev);
   }
 
-  /* ============ 초기 렌더 ============ */
+  /* ============ 초기 렌더 (네트워크 여부와 무관하게 항상 실행) ============ */
   populateCategorySelect();
   renderDashboard();
   renderRecords();
   renderCategories();
   renderAssets();
+
+  /* ============ 클라우드 동기화는 비동기로 별도 시도 ============ */
+  initCloudSync();
 })();
