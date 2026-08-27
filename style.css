@@ -355,6 +355,70 @@ button, input, select {
 }
 .asset-summary > div { display: flex; flex-direction: column; gap: 6px; }
 
+/* ============ 자산 변동 추이 (월별 막대) ============ */
+.trend-headline {
+  margin: -4px 0 18px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.trend-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.trend-bar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 46px;
+}
+.trend-value {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.trend-value.pos { color: var(--income); }
+.trend-value.neg { color: var(--ink-soft); }
+.trend-bar-item.current .trend-value {
+  font-size: 13px;
+  color: var(--blue-deep);
+}
+.trend-bar-track {
+  width: 100%;
+  max-width: 34px;
+  height: 130px;
+  display: flex;
+  align-items: flex-end;
+  background: var(--paper);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.trend-bar-fill {
+  width: 100%;
+  min-height: 4px;
+  background: var(--line);
+  border-radius: 10px 10px 0 0;
+  transition: height 0.3s ease;
+}
+.trend-bar-item.current .trend-bar-fill {
+  background: var(--blue-deep);
+}
+.trend-month-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.trend-bar-item.current .trend-month-label {
+  color: var(--ink);
+  font-weight: 800;
+}
+
 /* ============ Entry form ============ */
 .entry-form {
   background: var(--card);

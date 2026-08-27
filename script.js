@@ -181,6 +181,17 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }
 
+  function shiftMonthStr(monthStr, offset) {
+    const [y, m] = monthStr.split('-').map(Number);
+    const d = new Date(y, m - 1 + offset, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  function monthLabel(monthStr) {
+    const [, m] = monthStr.split('-').map(Number);
+    return monthStr === currentMonthStr() ? '이번달' : `${m}월`;
+  }
+
   function categoryById(id) {
     return state.categories.find(c => c.id === id);
   }
@@ -642,6 +653,54 @@
     const totalPrev = computeAssetTotal(prevMonthStr(month), true);
     document.getElementById('assetTotalNow').textContent = fmt(totalNow);
     setDelta(document.getElementById('assetTotalDelta'), totalNow, totalPrev);
+
+    renderAssetTrend(month);
+  }
+
+  // 선택한 달을 기준으로 최근 12개월간의 월별 자산 변동(전월 대비 증감)을 막대그래프로 표시
+  function renderAssetTrend(endMonth) {
+    const headline = document.getElementById('trendHeadline');
+    const box = document.getElementById('assetTrendChart');
+    if (!headline || !box) return;
+
+    if (!state.assets.length) {
+      headline.textContent = '자산 항목을 등록하면 월별 변동 추이가 표시돼요.';
+      box.innerHTML = '';
+      return;
+    }
+
+    const months = [];
+    for (let i = 11; i >= 0; i--) months.push(shiftMonthStr(endMonth, -i));
+
+    const deltas = months.map(m => {
+      const cur = computeAssetTotal(m, true);
+      const prev = computeAssetTotal(prevMonthStr(m), true);
+      if (cur === null || prev === null) return null;
+      return cur - prev;
+    });
+
+    const maxAbs = Math.max(1, ...deltas.filter(v => v !== null).map(v => Math.abs(v)));
+    const lastDelta = deltas[deltas.length - 1];
+
+    if (lastDelta === null) {
+      headline.textContent = '아직 비교할 이전 달 데이터가 없어요.';
+    } else {
+      headline.textContent = `총자산이 지난달보다 ${fmt(Math.abs(lastDelta))}원 ${lastDelta >= 0 ? '늘었어요' : '줄었어요'}`;
+    }
+
+    box.innerHTML = '';
+    months.forEach((m, i) => {
+      const delta = deltas[i];
+      const isCurrent = i === months.length - 1;
+      const pct = delta === null ? 4 : Math.max(4, Math.abs(delta) / maxAbs * 100);
+      const item = document.createElement('div');
+      item.className = 'trend-bar-item' + (isCurrent ? ' current' : '');
+      item.innerHTML = `
+        <span class="trend-value ${delta === null ? '' : (delta >= 0 ? 'pos' : 'neg')}">${delta === null ? '-' : (delta >= 0 ? '+' : '-') + fmt(Math.abs(delta))}</span>
+        <div class="trend-bar-track"><div class="trend-bar-fill" style="height:${pct}%"></div></div>
+        <span class="trend-month-label">${monthLabel(m)}</span>`;
+      box.appendChild(item);
+    });
   }
 
   /* ============ 초기 렌더 (네트워크 여부와 무관하게 항상 실행) ============ */
