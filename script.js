@@ -82,9 +82,23 @@
 
     lastSyncedJson = json;
     setStamp('동기화 중...');
+
+    // 8초 넘게 응답이 없으면 "멈춘 척" 하지 않고 상태를 알려줌
+    // (실제 저장 요청은 백그라운드에서 계속 시도됨)
+    let settled = false;
+    const slowTimer = setTimeout(() => {
+      if (!settled) setStamp('저장 지연 중... (네트워크 확인 필요)');
+    }, 8000);
+
     cloudSetDoc(cloudDocRef, { json, updatedAt: Date.now() })
-      .then(() => setStamp('동기화됨 ' + new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }), 2000))
+      .then(() => {
+        settled = true;
+        clearTimeout(slowTimer);
+        setStamp('동기화됨 ' + new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }), 2000);
+      })
       .catch((err) => {
+        settled = true;
+        clearTimeout(slowTimer);
         console.error('클라우드 저장 실패, 이 기기에만 저장됨', err);
         setStamp('오프라인 저장(이 기기만)', 3000);
       });
@@ -97,10 +111,12 @@
         import('https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js'),
         import('https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js'),
       ]);
-      const { getFirestore, doc, setDoc, onSnapshot } = firestoreMod;
+      const { initializeFirestore, doc, setDoc, onSnapshot } = firestoreMod;
 
       const app = initializeApp(firebaseConfig);
-      const db = getFirestore(app);
+      // 일부 와이파이/통신사 네트워크에서 기본 연결(WebSocket)이 막히는 경우가 있어
+      // 자동으로 우회 방식(long polling)을 쓰도록 설정
+      const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
       cloudDocRef = doc(db, 'ledger', 'main');
       cloudSetDoc = setDoc;
 
