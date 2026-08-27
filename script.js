@@ -61,13 +61,16 @@
 
   let state = loadState();
 
+  let cloudConnected = false;
+
   function setStamp(text, revertAfterMs) {
     const stamp = document.getElementById('dataStamp');
     if (!stamp) return;
     stamp.textContent = text;
     clearTimeout(setStamp._t);
     if (revertAfterMs) {
-      setStamp._t = setTimeout(() => { stamp.textContent = 'CLOUD SYNC'; }, revertAfterMs);
+      const idleText = cloudConnected ? '☁ 실시간 동기화 중' : 'CLOUD SYNC';
+      setStamp._t = setTimeout(() => { stamp.textContent = idleText; }, revertAfterMs);
     }
   }
 
@@ -102,6 +105,7 @@
       cloudSetDoc = setDoc;
 
       onSnapshot(cloudDocRef, (snap) => {
+        cloudConnected = true;
         if (!snap.exists()) {
           // 클라우드에 데이터가 아직 없으면 현재(로컬) 상태를 최초 업로드
           firstSnapshot = false;
@@ -111,6 +115,7 @@
         const data = snap.data();
         if (data.json === lastSyncedJson) {
           firstSnapshot = false;
+          setStamp('☁ 실시간 동기화 중');
           return;
         }
         try {
@@ -128,18 +133,18 @@
           renderRecords();
           renderCategories();
           renderAssets();
-          if (!firstSnapshot) setStamp('다른 기기에서 업데이트됨', 2500);
+          setStamp(firstSnapshot ? '☁ 실시간 동기화 중' : '다른 기기에서 업데이트됨', firstSnapshot ? 0 : 2500);
         } catch (e) {
           console.error('클라우드 데이터 파싱 실패', e);
         }
         firstSnapshot = false;
       }, (err) => {
         console.error('클라우드 연결 실패', err);
-        setStamp('연결 오류(이 기기만 저장됨)', 3000);
+        setStamp('연결 오류(이 기기만 저장됨)');
       });
     } catch (e) {
       console.error('클라우드 동기화를 불러오지 못했습니다. 이 기기에만 저장됩니다.', e);
-      setStamp('오프라인 모드(이 기기만)', 4000);
+      setStamp('오프라인 모드(이 기기만)');
     }
   }
 
