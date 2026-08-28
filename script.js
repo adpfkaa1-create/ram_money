@@ -335,6 +335,29 @@
     return total;
   }
 
+  // 특정 자산의 특정 달 이전(포함) 가장 최근 입력값을 찾음 (없으면 null)
+  function lastKnownAssetValue(assetId, uptoMonth) {
+    const months = Object.keys(state.assetSnapshots).filter(m => m <= uptoMonth).sort();
+    for (let i = months.length - 1; i >= 0; i--) {
+      const snap = state.assetSnapshots[months[i]];
+      if (snap && snap[assetId] !== undefined) return snap[assetId];
+    }
+    return null;
+  }
+
+  // "10,000" 같은 콤마 표기 문자열에서 숫자만 추출
+  function parseAmountInput(el) {
+    return Number(String(el.value).replace(/[^0-9-]/g, '')) || 0;
+  }
+
+  // 입력창에 숫자를 입력하면 실시간으로 천단위 콤마를 붙여줌
+  function attachCommaFormat(el) {
+    el.addEventListener('input', () => {
+      const digits = el.value.replace(/[^0-9]/g, '');
+      el.value = digits ? Number(digits).toLocaleString('ko-KR') : '';
+    });
+  }
+
   function escapeHtml(str) {
     const d = document.createElement('div');
     d.textContent = str;
@@ -358,6 +381,7 @@
 
   let currentEntryType = 'expense';
   entryDate.value = new Date().toISOString().slice(0, 10);
+  attachCommaFormat(entryAmount);
 
   toggleBtns.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -377,7 +401,7 @@
 
   entryForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const amount = Number(entryAmount.value);
+    const amount = parseAmountInput(entryAmount);
     if (!amount || amount <= 0) return;
     if (!entryCategory.value) { alert('카테고리를 먼저 추가해주세요.'); return; }
 
@@ -434,7 +458,7 @@
     methodWrap.style.display = tx.type === 'expense' ? '' : 'none';
     populateCategorySelect();
     entryDate.value = tx.date;
-    entryAmount.value = tx.amount;
+    entryAmount.value = tx.amount.toLocaleString('ko-KR');
     entryCategory.value = tx.categoryId;
     if (tx.method) entryMethod.value = tx.method;
     entryMemo.value = tx.memo || '';
@@ -620,26 +644,34 @@
     } else {
       state.assets.forEach(asset => {
         const tr = document.createElement('tr');
-        const val = snap[asset.id] !== undefined ? snap[asset.id] : '';
+        let val = snap[asset.id];
+        let carried = false;
+        if (val === undefined) {
+          const prevVal = lastKnownAssetValue(asset.id, prevMonthStr(month));
+          if (prevVal !== null) { val = prevVal; carried = true; }
+        }
+        const displayVal = val !== undefined && val !== '' ? Number(val).toLocaleString('ko-KR') : '';
         tr.innerHTML = `
           <td>${escapeHtml(asset.name)}</td>
           <td><span class="type-pill ${asset.isDebt ? 'expense' : 'income'}">${asset.isDebt ? '부채' : '자산'}</span></td>
-          <td class="num"><input class="asset-input" type="number" step="1" data-asset="${asset.id}" value="${val}" placeholder="0"></td>
+          <td class="num"><input class="asset-input${carried ? ' carried' : ''}" type="text" inputmode="numeric" data-asset="${asset.id}" value="${displayVal}" placeholder="0"${carried ? ' title="지난달 값을 그대로 가져왔어요. 다르면 수정해주세요."' : ''}></td>
           <td><div class="row-actions"><button class="icon-btn danger" data-del-asset="${asset.id}">삭제</button></div></td>`;
         body.appendChild(tr);
       });
     }
 
     body.querySelectorAll('[data-asset]').forEach(inp => {
+      attachCommaFormat(inp);
       inp.addEventListener('change', () => {
         if (!state.assetSnapshots[month]) state.assetSnapshots[month] = {};
-        state.assetSnapshots[month][inp.dataset.asset] = Number(inp.value) || 0;
+        state.assetSnapshots[month][inp.dataset.asset] = parseAmountInput(inp);
         saveState();
         renderAssets();
       });
     });
 
     body.querySelectorAll('[data-del-asset]').forEach(btn => {
+
       btn.addEventListener('click', () => {
         if (!confirm('이 자산 항목과 모든 월별 잔액 기록을 삭제할까요?')) return;
         state.assets = state.assets.filter(a => a.id !== btn.dataset.delAsset);
@@ -664,7 +696,7 @@
     if (!headline || !box) return;
 
     if (!state.assets.length) {
-      headline.textContent = '자산 항목을 등록하면 월별 변동 추이가 표시돼요.';
+      headline.textContent = '자산 항목을 등록하면 월별 총자산 추이가 표시돼요.';
       box.innerHTML = '';
       return;
     }
@@ -672,31 +704,28 @@
     const months = [];
     for (let i = 11; i >= 0; i--) months.push(shiftMonthStr(endMonth, -i));
 
-    const deltas = months.map(m => {
-      const cur = computeAssetTotal(m, true);
-      const prev = computeAssetTotal(prevMonthStr(m), true);
-      if (cur === null || prev === null) return null;
-      return cur - prev;
-    });
+    const totals = months.map(m => computeAssetTotal(m, true));
+    const known = totals.filter(v => v !== null);
 
-    const maxAbs = Math.max(1, ...deltas.filter(v => v !== null).map(v => Math.abs(v)));
-    const lastDelta = deltas[deltas.length - 1];
-
-    if (lastDelta === null) {
-      headline.textContent = '아직 비교할 이전 달 데이터가 없어요.';
-    } else {
-      headline.textContent = `총자산이 지난달보다 ${fmt(Math.abs(lastDelta))}원 ${lastDelta >= 0 ? '늘었어요' : '줄었어요'}`;
+    if (!known.length) {
+      headline.textContent = '아직 입력된 자산 데이터가 없어요.';
+      box.innerHTML = '';
+      return;
     }
+
+    headline.textContent = '최근 12개월 총자산 흐름이에요';
+    const maxAbs = Math.max(1, ...known.map(v => Math.abs(v)));
 
     box.innerHTML = '';
     months.forEach((m, i) => {
-      const delta = deltas[i];
+      const total = totals[i];
       const isCurrent = i === months.length - 1;
-      const pct = delta === null ? 4 : Math.max(4, Math.abs(delta) / maxAbs * 100);
+      const isNegative = total !== null && total < 0;
+      const pct = total === null ? 4 : Math.max(4, Math.abs(total) / maxAbs * 100);
       const item = document.createElement('div');
-      item.className = 'trend-bar-item' + (isCurrent ? ' current' : '');
+      item.className = 'trend-bar-item' + (isCurrent ? ' current' : (isNegative ? ' negative' : ''));
       item.innerHTML = `
-        <span class="trend-value ${delta === null ? '' : (delta >= 0 ? 'pos' : 'neg')}">${delta === null ? '-' : (delta >= 0 ? '+' : '-') + fmt(Math.abs(delta))}</span>
+        <span class="trend-value ${isCurrent ? '' : (isNegative ? 'neg' : '')}">${total === null ? '-' : fmt(total)}</span>
         <div class="trend-bar-track"><div class="trend-bar-fill" style="height:${pct}%"></div></div>
         <span class="trend-month-label">${monthLabel(m)}</span>`;
       box.appendChild(item);

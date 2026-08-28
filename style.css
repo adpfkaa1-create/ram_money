@@ -383,8 +383,7 @@ button, input, select {
   color: var(--ink-soft);
   white-space: nowrap;
 }
-.trend-value.pos { color: var(--income); }
-.trend-value.neg { color: var(--ink-soft); }
+.trend-value.neg { color: var(--expense); }
 .trend-bar-item.current .trend-value {
   font-size: 13px;
   color: var(--blue-deep);
@@ -408,6 +407,9 @@ button, input, select {
 }
 .trend-bar-item.current .trend-bar-fill {
   background: var(--blue-deep);
+}
+.trend-bar-item.negative .trend-bar-fill {
+  background: var(--expense-soft);
 }
 .trend-month-label {
   font-size: 11px;
@@ -617,6 +619,8 @@ button, input, select {
   background: var(--paper);
 }
 .asset-input:focus { outline: none; border-color: var(--teal); background: #fff; }
+.asset-input.carried { color: var(--ink-soft); border-style: dashed; }
+.asset-input.carried:focus { color: var(--ink); border-style: solid; }
 
 /* ============ Categories ============ */
 .inline-add {
