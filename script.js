@@ -660,17 +660,26 @@
       return;
     }
 
-    const snap = state.budgets[month] || {};
+    // 이번 달에 아직 입력 안 한 예산은 지난달 값을 실제로 확정 저장 (미리보기 아님)
+    let carriedOver = false;
+    if (!state.budgets[month]) state.budgets[month] = {};
+    const snap = state.budgets[month];
+    expenseCats.forEach(cat => {
+      if (snap[cat.id] === undefined) {
+        const prevVal = lastKnownBudgetValue(cat.id, prevMonthStr(month));
+        if (prevVal !== null) {
+          snap[cat.id] = prevVal;
+          carriedOver = true;
+        }
+      }
+    });
+    if (carriedOver) saveState();
+
     let totalPlan = 0;
     let totalSpent = 0;
 
     expenseCats.forEach(cat => {
-      let budget = snap[cat.id];
-      let carried = false;
-      if (budget === undefined) {
-        const prevVal = lastKnownBudgetValue(cat.id, prevMonthStr(month));
-        if (prevVal !== null) { budget = prevVal; carried = true; }
-      }
+      const budget = snap[cat.id];
       const budgetNum = budget !== undefined && budget !== '' ? Number(budget) : 0;
       const spent = monthTx.filter(t => t.categoryId === cat.id).reduce((s, t) => s + t.amount, 0);
       totalPlan += budgetNum;
@@ -685,7 +694,7 @@
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${escapeHtml(cat.name)}</td>
-        <td class="num"><input class="budget-input${carried ? ' carried' : ''}" type="text" inputmode="numeric" data-cat="${cat.id}" value="${displayVal}" placeholder="0"${carried ? ' title="지난달 예산을 그대로 가져왔어요. 다르면 수정해주세요."' : ''}></td>
+        <td class="num"><input class="budget-input" type="text" inputmode="numeric" data-cat="${cat.id}" value="${displayVal}" placeholder="0"></td>
         <td class="num">${fmt(spent)}</td>
         <td>
           ${budgetNum > 0
@@ -732,7 +741,23 @@
 
   function renderAssets() {
     const month = assetMonth.value;
-    const snap = state.assetSnapshots[month] || {};
+
+    // 이번 달에 아직 입력 안 한 자산은 지난달 값을 실제로 이번 달 값으로 확정 저장
+    // (미리보기가 아니라 진짜 데이터로 남도록 함 — 깜빡임/미저장 문제 방지)
+    let carriedOver = false;
+    if (!state.assetSnapshots[month]) state.assetSnapshots[month] = {};
+    const snap = state.assetSnapshots[month];
+    state.assets.forEach(asset => {
+      if (snap[asset.id] === undefined) {
+        const prevVal = lastKnownAssetValue(asset.id, prevMonthStr(month));
+        if (prevVal !== null) {
+          snap[asset.id] = prevVal;
+          carriedOver = true;
+        }
+      }
+    });
+    if (carriedOver) saveState();
+
     const body = document.getElementById('assetBody');
     body.innerHTML = '';
 
@@ -741,12 +766,7 @@
     } else {
       state.assets.forEach((asset, idx) => {
         const tr = document.createElement('tr');
-        let val = snap[asset.id];
-        let carried = false;
-        if (val === undefined) {
-          const prevVal = lastKnownAssetValue(asset.id, prevMonthStr(month));
-          if (prevVal !== null) { val = prevVal; carried = true; }
-        }
+        const val = snap[asset.id];
         const displayVal = val !== undefined && val !== '' ? Number(val).toLocaleString('ko-KR') : '';
         tr.innerHTML = `
           <td>
@@ -755,7 +775,7 @@
               <button class="reorder-btn" data-move-down="${asset.id}" ${idx === state.assets.length - 1 ? 'disabled' : ''} title="아래로">▼</button>
             </div>${escapeHtml(asset.name)}</td>
           <td><span class="type-pill ${asset.isDebt ? 'expense' : 'income'}">${asset.isDebt ? '부채' : '자산'}</span></td>
-          <td class="num"><input class="asset-input${carried ? ' carried' : ''}" type="text" inputmode="numeric" data-asset="${asset.id}" value="${displayVal}" placeholder="0"${carried ? ' title="지난달 값을 그대로 가져왔어요. 다르면 수정해주세요."' : ''}></td>
+          <td class="num"><input class="asset-input" type="text" inputmode="numeric" data-asset="${asset.id}" value="${displayVal}" placeholder="0"></td>
           <td><div class="row-actions"><button class="icon-btn danger" data-del-asset="${asset.id}">삭제</button></div></td>`;
         body.appendChild(tr);
       });
