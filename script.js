@@ -596,9 +596,13 @@
       ul.innerHTML = '<li class="empty-note" style="border:none;">카테고리가 없습니다.</li>';
       return;
     }
-    list.forEach(cat => {
+    list.forEach((cat, idx) => {
       const li = document.createElement('li');
       li.innerHTML = `
+        <div class="reorder-btns">
+          <button class="reorder-btn" data-move-cat-up="${cat.id}" ${idx === 0 ? 'disabled' : ''} title="위로">▲</button>
+          <button class="reorder-btn" data-move-cat-down="${cat.id}" ${idx === list.length - 1 ? 'disabled' : ''} title="아래로">▼</button>
+        </div>
         <input type="text" value="${escapeHtml(cat.name)}" data-id="${cat.id}">
         <button class="icon-btn danger" data-del-cat="${cat.id}">삭제</button>`;
       ul.appendChild(li);
@@ -617,6 +621,13 @@
       });
     });
 
+    ul.querySelectorAll('[data-move-cat-up]').forEach(btn => {
+      btn.addEventListener('click', () => moveCategory(btn.dataset.moveCatUp, -1));
+    });
+    ul.querySelectorAll('[data-move-cat-down]').forEach(btn => {
+      btn.addEventListener('click', () => moveCategory(btn.dataset.moveCatDown, 1));
+    });
+
     ul.querySelectorAll('[data-del-cat]').forEach(btn => {
       btn.addEventListener('click', () => {
         const inUse = state.transactions.some(t => t.categoryId === btn.dataset.delCat);
@@ -628,6 +639,24 @@
         renderBudget();
       });
     });
+  }
+
+  // 같은 유형(수입/지출) 내에서만 카테고리 순서를 위/아래로 바꿈
+  function moveCategory(id, direction) {
+    const cat = categoryById(id);
+    if (!cat) return;
+    const sameType = state.categories.filter(c => c.type === cat.type);
+    const idx = sameType.findIndex(c => c.id === id);
+    const targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= sameType.length) return;
+    const otherCat = sameType[targetIdx];
+    const fullIdxA = state.categories.findIndex(c => c.id === cat.id);
+    const fullIdxB = state.categories.findIndex(c => c.id === otherCat.id);
+    [state.categories[fullIdxA], state.categories[fullIdxB]] = [state.categories[fullIdxB], state.categories[fullIdxA]];
+    saveState();
+    renderCategories();
+    populateCategorySelect();
+    renderBudget();
   }
 
   /* ================================================================

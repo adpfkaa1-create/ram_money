@@ -736,7 +736,7 @@ button, input, select {
 .cat-list li {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   padding: 10px 14px;
   border: none;
   border-radius: 14px;
