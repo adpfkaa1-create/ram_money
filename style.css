@@ -622,6 +622,77 @@ button, input, select {
 .asset-input.carried { color: var(--ink-soft); border-style: dashed; }
 .asset-input.carried:focus { color: var(--ink); border-style: solid; }
 
+/* ============ 예산 ============ */
+.budget-input {
+  width: 130px;
+  text-align: right;
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  padding: 7px 11px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--paper);
+}
+.budget-input:focus { outline: none; border-color: var(--teal); background: #fff; }
+.budget-input.carried { color: var(--ink-soft); border-style: dashed; }
+.budget-input.carried:focus { color: var(--ink); border-style: solid; }
+
+.budget-progress-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 140px;
+}
+.budget-progress-track {
+  flex: 1;
+  height: 10px;
+  background: var(--yellow-soft);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.budget-progress-fill {
+  display: block;
+  height: 100%;
+  min-width: 3px;
+  background: var(--blue-deep);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+.budget-progress-fill.warn { background: var(--brass, #c98a2b); }
+.budget-progress-fill.over { background: var(--expense); }
+.budget-progress-pct {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  min-width: 38px;
+  text-align: right;
+}
+.budget-progress-pct.over { color: var(--expense); }
+.budget-left.negative { color: var(--expense); }
+.budget-no-plan { color: var(--ink-soft); font-size: 12.5px; }
+
+/* ============ 자산 순서 변경 버튼 ============ */
+.reorder-btns {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.reorder-btn {
+  border: none;
+  background: var(--paper);
+  color: var(--ink-soft);
+  width: 20px;
+  height: 16px;
+  line-height: 16px;
+  font-size: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.reorder-btn:hover:not(:disabled) { background: var(--teal-soft); color: var(--teal-dark); }
+.reorder-btn:disabled { opacity: 0.3; cursor: default; }
+
 /* ============ Categories ============ */
 .inline-add {
   display: flex;

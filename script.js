@@ -36,6 +36,7 @@
     transactions: [],
     assets: [],
     assetSnapshots: {},
+    budgets: {},
   });
 
   function uid() {
@@ -52,6 +53,7 @@
         transactions: parsed.transactions || [],
         assets: parsed.assets || [],
         assetSnapshots: parsed.assetSnapshots || {},
+        budgets: parsed.budgets || {},
       };
     } catch (e) {
       console.error('상태 로드 실패, 기본값 사용', e);
@@ -141,6 +143,7 @@
             transactions: parsed.transactions || [],
             assets: parsed.assets || [],
             assetSnapshots: parsed.assetSnapshots || {},
+            budgets: parsed.budgets || {},
           };
           lastSyncedJson = data.json;
           localStorage.setItem(STORAGE_KEY, data.json);
@@ -148,6 +151,7 @@
           renderDashboard();
           renderRecords();
           renderCategories();
+          renderBudget();
           renderAssets();
           setStamp(firstSnapshot ? '☁ 실시간 동기화 중' : '다른 기기에서 업데이트됨', firstSnapshot ? 0 : 2500);
         } catch (e) {
@@ -213,6 +217,7 @@
       if (btn.dataset.view === 'dashboard') renderDashboard();
       if (btn.dataset.view === 'records') renderRecords();
       if (btn.dataset.view === 'categories') renderCategories();
+      if (btn.dataset.view === 'budget') renderBudget();
       if (btn.dataset.view === 'assets') renderAssets();
     });
   });
@@ -220,14 +225,17 @@
   /* ============ 월 선택기 초기화 ============ */
   const dashMonth = document.getElementById('dashMonth');
   const recMonth = document.getElementById('recMonth');
+  const budgetMonth = document.getElementById('budgetMonth');
   const assetMonth = document.getElementById('assetMonth');
   const nowMonth = currentMonthStr();
   dashMonth.value = nowMonth;
   recMonth.value = nowMonth;
+  budgetMonth.value = nowMonth;
   assetMonth.value = nowMonth;
 
   dashMonth.addEventListener('change', renderDashboard);
   recMonth.addEventListener('change', renderRecords);
+  budgetMonth.addEventListener('change', renderBudget);
   assetMonth.addEventListener('change', renderAssets);
 
   /* ================================================================
@@ -432,6 +440,7 @@
     saveState();
     resetEntryForm();
     renderRecords();
+    renderBudget();
   });
 
   entryCancelBtn.addEventListener('click', resetEntryForm);
@@ -472,6 +481,7 @@
     state.transactions = state.transactions.filter(t => t.id !== id);
     saveState();
     renderRecords();
+    renderBudget();
   }
 
   let groupByCategory = false;
@@ -570,6 +580,7 @@
       saveState();
       renderCategories();
       populateCategorySelect();
+      renderBudget();
     });
   });
 
@@ -601,6 +612,7 @@
           saveState();
           renderDashboard();
           populateCategorySelect();
+          renderBudget();
         }
       });
     });
@@ -613,8 +625,93 @@
         saveState();
         renderCategories();
         populateCategorySelect();
+        renderBudget();
       });
     });
+  }
+
+  /* ================================================================
+     예산 관리
+  ================================================================ */
+
+  // 특정 카테고리의 특정 달 이전(포함) 가장 최근 입력 예산을 찾음 (없으면 null)
+  function lastKnownBudgetValue(categoryId, uptoMonth) {
+    const months = Object.keys(state.budgets).filter(m => m <= uptoMonth).sort();
+    for (let i = months.length - 1; i >= 0; i--) {
+      const b = state.budgets[months[i]];
+      if (b && b[categoryId] !== undefined) return b[categoryId];
+    }
+    return null;
+  }
+
+  function renderBudget() {
+    const month = budgetMonth.value;
+    const body = document.getElementById('budgetBody');
+    body.innerHTML = '';
+
+    const expenseCats = state.categories.filter(c => c.type === 'expense');
+    const monthTx = state.transactions.filter(t => t.date.startsWith(month) && t.type === 'expense');
+
+    if (!expenseCats.length) {
+      body.innerHTML = '<tr><td colspan="5" class="empty-note">지출 카테고리를 먼저 추가해주세요.</td></tr>';
+      document.getElementById('budgetTotalPlan').textContent = fmt(0);
+      document.getElementById('budgetTotalSpent').textContent = fmt(0);
+      setDelta(document.getElementById('budgetTotalLeft'), 0, 0);
+      return;
+    }
+
+    const snap = state.budgets[month] || {};
+    let totalPlan = 0;
+    let totalSpent = 0;
+
+    expenseCats.forEach(cat => {
+      let budget = snap[cat.id];
+      let carried = false;
+      if (budget === undefined) {
+        const prevVal = lastKnownBudgetValue(cat.id, prevMonthStr(month));
+        if (prevVal !== null) { budget = prevVal; carried = true; }
+      }
+      const budgetNum = budget !== undefined && budget !== '' ? Number(budget) : 0;
+      const spent = monthTx.filter(t => t.categoryId === cat.id).reduce((s, t) => s + t.amount, 0);
+      totalPlan += budgetNum;
+      totalSpent += spent;
+
+      const pct = budgetNum > 0 ? Math.round(spent / budgetNum * 100) : (spent > 0 ? 100 : 0);
+      const over = budgetNum > 0 && spent > budgetNum;
+      const warn = !over && pct >= 80;
+      const left = budgetNum - spent;
+      const displayVal = budgetNum ? Number(budgetNum).toLocaleString('ko-KR') : '';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(cat.name)}</td>
+        <td class="num"><input class="budget-input${carried ? ' carried' : ''}" type="text" inputmode="numeric" data-cat="${cat.id}" value="${displayVal}" placeholder="0"${carried ? ' title="지난달 예산을 그대로 가져왔어요. 다르면 수정해주세요."' : ''}></td>
+        <td class="num">${fmt(spent)}</td>
+        <td>
+          ${budgetNum > 0
+            ? `<div class="budget-progress-cell">
+                 <div class="budget-progress-track"><div class="budget-progress-fill ${over ? 'over' : (warn ? 'warn' : '')}" style="width:${Math.min(100, pct)}%"></div></div>
+                 <span class="budget-progress-pct ${over ? 'over' : ''}">${pct}%</span>
+               </div>`
+            : `<span class="budget-no-plan">예산 미설정</span>`}
+        </td>
+        <td class="num ${left < 0 ? 'budget-left negative' : 'budget-left'}">${fmt(left)}</td>`;
+      body.appendChild(tr);
+    });
+
+    body.querySelectorAll('[data-cat]').forEach(inp => {
+      attachCommaFormat(inp);
+      inp.addEventListener('change', () => {
+        if (!state.budgets[month]) state.budgets[month] = {};
+        state.budgets[month][inp.dataset.cat] = parseAmountInput(inp);
+        saveState();
+        renderBudget();
+      });
+    });
+
+    document.getElementById('budgetTotalPlan').textContent = fmt(totalPlan);
+    document.getElementById('budgetTotalSpent').textContent = fmt(totalSpent);
+    setDelta(document.getElementById('budgetTotalLeft'), totalPlan - totalSpent, 0);
   }
 
   /* ================================================================
@@ -642,7 +739,7 @@
     if (!state.assets.length) {
       body.innerHTML = '<tr><td colspan="4" class="empty-note">등록된 자산 항목이 없습니다.</td></tr>';
     } else {
-      state.assets.forEach(asset => {
+      state.assets.forEach((asset, idx) => {
         const tr = document.createElement('tr');
         let val = snap[asset.id];
         let carried = false;
@@ -652,13 +749,39 @@
         }
         const displayVal = val !== undefined && val !== '' ? Number(val).toLocaleString('ko-KR') : '';
         tr.innerHTML = `
-          <td>${escapeHtml(asset.name)}</td>
+          <td>
+            <div class="reorder-btns">
+              <button class="reorder-btn" data-move-up="${asset.id}" ${idx === 0 ? 'disabled' : ''} title="위로">▲</button>
+              <button class="reorder-btn" data-move-down="${asset.id}" ${idx === state.assets.length - 1 ? 'disabled' : ''} title="아래로">▼</button>
+            </div>${escapeHtml(asset.name)}</td>
           <td><span class="type-pill ${asset.isDebt ? 'expense' : 'income'}">${asset.isDebt ? '부채' : '자산'}</span></td>
           <td class="num"><input class="asset-input${carried ? ' carried' : ''}" type="text" inputmode="numeric" data-asset="${asset.id}" value="${displayVal}" placeholder="0"${carried ? ' title="지난달 값을 그대로 가져왔어요. 다르면 수정해주세요."' : ''}></td>
           <td><div class="row-actions"><button class="icon-btn danger" data-del-asset="${asset.id}">삭제</button></div></td>`;
         body.appendChild(tr);
       });
     }
+
+    body.querySelectorAll('[data-move-up]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = state.assets.findIndex(a => a.id === btn.dataset.moveUp);
+        if (i > 0) {
+          [state.assets[i - 1], state.assets[i]] = [state.assets[i], state.assets[i - 1]];
+          saveState();
+          renderAssets();
+        }
+      });
+    });
+
+    body.querySelectorAll('[data-move-down]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = state.assets.findIndex(a => a.id === btn.dataset.moveDown);
+        if (i !== -1 && i < state.assets.length - 1) {
+          [state.assets[i + 1], state.assets[i]] = [state.assets[i], state.assets[i + 1]];
+          saveState();
+          renderAssets();
+        }
+      });
+    });
 
     body.querySelectorAll('[data-asset]').forEach(inp => {
       attachCommaFormat(inp);
@@ -737,6 +860,7 @@
   renderDashboard();
   renderRecords();
   renderCategories();
+  renderBudget();
   renderAssets();
 
   /* ============ 클라우드 동기화는 비동기로 별도 시도 ============ */

@@ -31,8 +31,11 @@
       <button class="nav-tab" data-view="categories">
         <span class="tab-idx">03</span>카테고리
       </button>
+      <button class="nav-tab" data-view="budget">
+        <span class="tab-idx">04</span>예산
+      </button>
       <button class="nav-tab" data-view="assets">
-        <span class="tab-idx">04</span>자산
+        <span class="tab-idx">05</span>자산
       </button>
     </nav>
 
@@ -200,6 +203,53 @@
             <button type="submit" class="btn-primary small">추가</button>
           </form>
           <ul class="cat-list" id="incomeCatList"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== 예산 ===================== -->
+    <section class="view" id="view-budget">
+      <header class="view-head">
+        <div>
+          <span class="eyebrow">Budget</span>
+          <h1>예산 관리</h1>
+        </div>
+        <label class="month-picker">
+          <span>예산 월</span>
+          <input type="month" id="budgetMonth">
+        </label>
+      </header>
+
+      <div class="stat-row">
+        <div class="stat-card">
+          <span class="stat-label">이번 달 총예산</span>
+          <span class="stat-value" id="budgetTotalPlan">0</span>
+        </div>
+        <div class="stat-card out">
+          <span class="stat-label">총지출</span>
+          <span class="stat-value" id="budgetTotalSpent">0</span>
+        </div>
+        <div class="stat-card net">
+          <span class="stat-label">남은 예산</span>
+          <span class="stat-value delta" id="budgetTotalLeft">0</span>
+        </div>
+      </div>
+
+      <div class="ledger-panel">
+        <h2>카테고리별 예산</h2>
+        <div class="table-wrap">
+          <table class="ledger-table" id="budgetTable">
+            <thead>
+              <tr>
+                <th>카테고리</th>
+                <th class="num">예산</th>
+                <th class="num">지출</th>
+                <th>사용률</th>
+                <th class="num">잔액</th>
+              </tr>
+            </thead>
+            <tbody id="budgetBody"></tbody>
+          </table>
         </div>
       </div>
     </section>
